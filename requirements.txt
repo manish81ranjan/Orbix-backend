@@ -1,0 +1,39 @@
+# Flask==3.0.0
+# flask-cors==4.0.0
+# python-dotenv==1.0.1
+# gunicorn==22.0.0
+
+# # MongoDB
+# pymongo==4.8.0
+
+# # Auth / Security
+# PyJWT==2.9.0
+# bcrypt==4.2.0
+
+# # Utilities
+# pydantic==2.8.2
+# ===============================
+# Core Framework
+# ===============================
+Flask==3.0.0
+flask-cors==4.0.0
+gunicorn==22.0.0
+python-dotenv==1.0.1
+
+# ===============================
+# Database (MongoDB)
+# ===============================
+pymongo==4.8.0
+dnspython==2.6.1
+
+# ===============================
+# Authentication & Security
+# ===============================
+Flask-Bcrypt==1.0.1
+PyJWT==2.9.0
+
+# ===============================
+# Validation / Utilities
+# ===============================
+pydantic==2.8.2
+cloudinary==1.41.0
