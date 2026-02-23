@@ -299,7 +299,6 @@
 
 
 #     return app
-
 # app/main.py
 import os
 from flask import Flask, jsonify, send_from_directory, request
@@ -321,47 +320,42 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
 
-    # Render / reverse proxy friendly
     app.url_map.strict_slashes = False
+    app.config["MAX_CONTENT_LENGTH"] = getattr(Config, "MAX_CONTENT_LENGTH", 25 * 1024 * 1024)
 
-    # upload limits
-    app.config["MAX_CONTENT_LENGTH"] = getattr(
-        Config, "MAX_CONTENT_LENGTH", 25 * 1024 * 1024
-    )
-
-    # ✅ IMPORTANT: init extensions FIRST (CORS must be attached before routes)
+    # ✅ CORS must be initialized before requests happen
     init_extensions(app)
 
-    # ---------- Uploads dir (Render friendly) ----------
+    # Uploads (Render safe)
     uploads_dir = os.environ.get("UPLOADS_DIR") or os.path.join("/tmp", "orbix_uploads")
     os.makedirs(uploads_dir, exist_ok=True)
     app.config["UPLOADS_DIR"] = uploads_dir
-    app.config["UPLOAD_FOLDER"] = uploads_dir  # compatibility
+    app.config["UPLOAD_FOLDER"] = uploads_dir
 
-    @app.route("/uploads/<path:filename>")
+    @app.get("/uploads/<path:filename>")
     def serve_upload(filename):
         return send_from_directory(app.config["UPLOADS_DIR"], filename)
 
-    # ---------- Indexes ----------
+    # DB indexes (don’t crash if DB not ready)
     try:
         db = get_db()
         create_indexes(db)
     except Exception:
         pass
 
-    # ---------- Blueprints ----------
-    app.register_blueprint(auth_bp)
-    app.register_blueprint(post_bp)
-    app.register_blueprint(upload_bp)
-    app.register_blueprint(notification_bp)
-    app.register_blueprint(user_bp)
-    app.register_blueprint(follow_bp)
+    # Blueprints
+    app.register_blueprint(auth_bp)          # /api/auth/...
+    app.register_blueprint(post_bp)          # /api/posts/...
+    app.register_blueprint(upload_bp)        # /api/upload/...
+    app.register_blueprint(notification_bp)  # /api/notifications/...
+    app.register_blueprint(user_bp)          # /api/users/...
+    app.register_blueprint(follow_bp)        # /api/follows/...
 
     @app.get("/api/health")
     def health():
         return jsonify({"status": "ok"}), 200
 
-    # ✅ IMPORTANT: don't break OPTIONS preflight
+    # ✅ if any error happens, still let OPTIONS succeed (preflight)
     @app.errorhandler(Exception)
     def handle_any_error(e):
         if request.method == "OPTIONS":
@@ -373,90 +367,3 @@ def create_app():
         return jsonify({"error": str(e)}), 500
 
     return app
-
-
-# import os
-# from flask import Flask, jsonify, send_from_directory
-# from werkzeug.exceptions import HTTPException
-# from flask_cors import CORS   # ✅ ADD THIS
-
-# from app.config import Config
-# from app.extensions import init_extensions, get_db
-# from app.db.indexes import create_indexes
-
-# from app.routes.auth_routes import auth_bp
-# from app.routes.post_routes import post_bp
-# from app.routes.upload_routes import upload_bp
-# from app.routes.notification_routes import notification_bp
-# from app.routes.user_routes import user_bp
-# from app.routes.follow_routes import follow_bp
-
-
-# def create_app():
-#     app = Flask(__name__)
-#     app.config.from_object(Config)
-
-#     # Render / reverse proxy friendly
-#     app.url_map.strict_slashes = False
-
-#     # Upload size limit
-#     app.config["MAX_CONTENT_LENGTH"] = getattr(
-#         Config, "MAX_CONTENT_LENGTH", 25 * 1024 * 1024
-#     )
-
-#     # =========================
-#     # ✅ CORS CONFIGURATION
-#     # =========================
-#     CORS(
-#         app,
-#         origins=[
-#             "https://orbix-frontend-1c18.vercel.app",
-#             "http://localhost:5173",
-#         ],
-#         supports_credentials=True,
-#     )
-
-#     # ---------- Extensions (Mongo, etc.) ----------
-#     init_extensions(app)
-
-#     # ---------- Uploads dir (Render safe) ----------
-#     uploads_dir = os.environ.get("UPLOADS_DIR") or os.path.join("/tmp", "orbix_uploads")
-#     os.makedirs(uploads_dir, exist_ok=True)
-
-#     app.config["UPLOADS_DIR"] = uploads_dir
-#     app.config["UPLOAD_FOLDER"] = uploads_dir
-
-#     @app.route("/uploads/<path:filename>")
-#     def serve_upload(filename):
-#         return send_from_directory(app.config["UPLOADS_DIR"], filename)
-
-#     # ---------- Indexes ----------
-#     try:
-#         db = get_db()
-#         create_indexes(db)
-#     except Exception:
-#         pass
-
-#     # ---------- Blueprints ----------
-#     app.register_blueprint(auth_bp)
-#     app.register_blueprint(post_bp)
-#     app.register_blueprint(upload_bp)
-#     app.register_blueprint(notification_bp)
-#     app.register_blueprint(user_bp)
-#     app.register_blueprint(follow_bp)
-
-#     @app.get("/api/health")
-#     def health():
-#         return jsonify({"status": "ok"}), 200
-
-#     # ---------- Global JSON Error Handler ----------
-#     @app.errorhandler(Exception)
-#     def handle_any_error(e):
-#         if isinstance(e, HTTPException):
-#             return jsonify({"error": e.description}), e.code
-#         return jsonify({"error": str(e)}), 500
-
-#     return app
-
-
-
