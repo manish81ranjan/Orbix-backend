@@ -300,12 +300,10 @@
 
 #     return app
 
-
-
+# app/main.py
 import os
-from flask import Flask, jsonify, send_from_directory
+from flask import Flask, jsonify, send_from_directory, request
 from werkzeug.exceptions import HTTPException
-from flask_cors import CORS
 
 from app.config import Config
 from app.extensions import init_extensions, get_db
@@ -322,33 +320,36 @@ from app.routes.follow_routes import follow_bp
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
+
+    # Render / reverse proxy friendly
     app.url_map.strict_slashes = False
 
+    # upload limits
     app.config["MAX_CONTENT_LENGTH"] = getattr(
         Config, "MAX_CONTENT_LENGTH", 25 * 1024 * 1024
     )
 
-    # ✅ CORS from ENV
-    origins = [o.strip().rstrip("/") for o in Config.CORS_ORIGINS.split(",") if o.strip()]
-    CORS(app, origins=origins, supports_credentials=True)
-
+    # ✅ IMPORTANT: init extensions FIRST (CORS must be attached before routes)
     init_extensions(app)
 
+    # ---------- Uploads dir (Render friendly) ----------
     uploads_dir = os.environ.get("UPLOADS_DIR") or os.path.join("/tmp", "orbix_uploads")
     os.makedirs(uploads_dir, exist_ok=True)
     app.config["UPLOADS_DIR"] = uploads_dir
-    app.config["UPLOAD_FOLDER"] = uploads_dir
+    app.config["UPLOAD_FOLDER"] = uploads_dir  # compatibility
 
     @app.route("/uploads/<path:filename>")
     def serve_upload(filename):
         return send_from_directory(app.config["UPLOADS_DIR"], filename)
 
+    # ---------- Indexes ----------
     try:
         db = get_db()
         create_indexes(db)
     except Exception:
         pass
 
+    # ---------- Blueprints ----------
     app.register_blueprint(auth_bp)
     app.register_blueprint(post_bp)
     app.register_blueprint(upload_bp)
@@ -360,14 +361,18 @@ def create_app():
     def health():
         return jsonify({"status": "ok"}), 200
 
+    # ✅ IMPORTANT: don't break OPTIONS preflight
     @app.errorhandler(Exception)
     def handle_any_error(e):
+        if request.method == "OPTIONS":
+            return ("", 204)
+
         if isinstance(e, HTTPException):
             return jsonify({"error": e.description}), e.code
+
         return jsonify({"error": str(e)}), 500
 
     return app
-
 
 
 # import os
@@ -452,5 +457,6 @@ def create_app():
 #         return jsonify({"error": str(e)}), 500
 
 #     return app
+
 
 
